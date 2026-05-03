@@ -36,9 +36,9 @@ export class JellyfinProviderBase {
       ...((options.headers as Record<string, string>) || {}),
     }
 
-    // Add 60 second timeout with AbortController (increased from 30s for large libraries)
+    // Add 180 second timeout with AbortController (increased from 60s for large libraries)
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 60000)
+    const timeoutId = setTimeout(() => controller.abort(), 180000)
 
     const startTime = Date.now()
     let response: Response
@@ -120,6 +120,3 @@ export class JellyfinProviderBase {
     return `${this.baseUrl}/Videos/${itemId}/stream`
   }
 }
-
-
-
