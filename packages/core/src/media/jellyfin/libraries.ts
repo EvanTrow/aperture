@@ -61,15 +61,27 @@ export async function createVirtualLibrary(
     return { libraryId: existing.id, alreadyExists: true }
   }
 
-  // CRITICAL: Must pass LibraryOptions.ContentType in JSON body for proper library type
-  await provider.fetch('/Library/VirtualFolders', apiKey, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  console.log(`Creating virtual library; name="${name}", path="${path}", type="${collectionType}"`, {
       Name: name,
       CollectionType: collectionType,
       Paths: [path],
       RefreshLibrary: true,
+      LibraryOptions: {
+        ContentType: collectionType,
+      },
+    })
+
+  // CRITICAL: Must pass LibraryOptions.ContentType in JSON body for proper library type
+  const queryParams = new URLSearchParams({
+    name,
+    collectionType,
+    paths: path,
+    refreshLibrary: 'true',
+  })
+  await provider.fetch(`/Library/VirtualFolders?${queryParams.toString()}`, apiKey, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
       LibraryOptions: {
         ContentType: collectionType,
       },
