@@ -17,9 +17,9 @@ export async function getLibraries(
   const libraries = Array.isArray(response) ? response : (response as any).Items || []
 
   return libraries.map((lib: JellyfinLibrary) => ({
-    // Jellyfin uses Id for VirtualFolders API
-    id: lib.Id,
-    guid: lib.Guid || lib.Id, // Jellyfin may use Id for permissions
+    // Jellyfin uses ItemId for VirtualFolders API
+    id: lib.ItemId,
+    guid: lib.Guid || lib.ItemId, // Jellyfin may use ItemId for permissions
     name: lib.Name,
     collectionType: lib.CollectionType,
     path: lib.Path,

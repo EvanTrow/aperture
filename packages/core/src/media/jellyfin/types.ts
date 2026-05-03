@@ -30,7 +30,7 @@ export interface JellyfinUser {
 }
 
 export interface JellyfinLibrary {
-  Id: string
+  ItemId: string
   Guid?: string
   Name: string
   CollectionType: string
@@ -119,4 +119,3 @@ export interface JellyfinSystemInfo {
   ServerName: string
   Version: string
 }
-
