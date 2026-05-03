@@ -27,9 +27,11 @@ interface LibraryConfigRow {
  * Get all library configurations
  * Optionally exclude Aperture-created libraries (tracked in strm_libraries table)
  */
-export async function getLibraryConfigs(excludeApertureLibraries = false): Promise<LibraryConfig[]> {
+export async function getLibraryConfigs(
+  excludeApertureLibraries = false
+): Promise<LibraryConfig[]> {
   let sql = 'SELECT * FROM library_config'
-  
+
   if (excludeApertureLibraries) {
     // Exclude all Aperture-created libraries:
     // 1. By provider_library_id (tracked in strm_libraries)
@@ -41,9 +43,9 @@ export async function getLibraryConfigs(excludeApertureLibraries = false): Promi
       AND name NOT LIKE '%Top Picks%'
       AND name NOT LIKE '%Aperture Picks%'`
   }
-  
+
   sql += ' ORDER BY name ASC'
-  
+
   const result = await query<LibraryConfigRow>(sql)
   return result.rows.map(mapRowToConfig)
 }
@@ -74,12 +76,12 @@ export async function getEnabledLibraryIds(): Promise<string[] | null> {
     const totalCount = await queryOne<{ count: string }>(
       "SELECT COUNT(*) FROM library_config WHERE collection_type = 'movies'"
     )
-    
+
     if (!totalCount || parseInt(totalCount.count, 10) === 0) {
       // No movie libraries configured at all - use all libraries
       return null
     }
-    
+
     // Libraries exist but none are enabled - return empty array (sync nothing)
     return []
   }
@@ -102,12 +104,12 @@ export async function getEnabledTvLibraryIds(): Promise<string[] | null> {
     const totalCount = await queryOne<{ count: string }>(
       "SELECT COUNT(*) FROM library_config WHERE collection_type = 'tvshows'"
     )
-    
+
     if (!totalCount || parseInt(totalCount.count, 10) === 0) {
       // No TV libraries configured at all - use all TV libraries
       return null
     }
-    
+
     // Libraries exist but none are enabled - return empty array (sync nothing)
     return []
   }
@@ -140,10 +142,7 @@ export async function upsertLibraryConfig(
     throw new Error('Failed to upsert library config')
   }
 
-  logger.info(
-    { providerLibraryId, name, isEnabled },
-    'Library config upserted'
-  )
+  logger.info({ providerLibraryId, name, isEnabled }, 'Library config upserted')
 
   return mapRowToConfig(result)
 }
@@ -167,10 +166,7 @@ export async function setLibraryEnabled(
     return null
   }
 
-  logger.info(
-    { providerLibraryId, isEnabled },
-    'Library enabled status updated'
-  )
+  logger.info({ providerLibraryId, isEnabled }, 'Library enabled status updated')
 
   return mapRowToConfig(result)
 }
@@ -181,24 +177,48 @@ export async function setLibraryEnabled(
  * but preserves existing enabled/disabled status
  */
 export async function syncLibraryConfigsFromProvider(
-  libraries: Array<{ id: string; name: string; collectionType: string | null }>
+  libraries: Array<{
+    id?: string | null
+    providerLibraryId?: string | null
+    libraryId?: string | null
+    virtualFolderId?: string | null
+    guid?: string | null
+    name: string
+    collectionType: string | null
+  }>
 ): Promise<{ added: number; updated: number; skipped: number }> {
   let added = 0
   let updated = 0
   let skipped = 0
 
   for (const lib of libraries) {
+    const providerLibraryId =
+      lib.id ?? lib.providerLibraryId ?? lib.libraryId ?? lib.virtualFolderId ?? lib.guid ?? null
+
+    // Some providers/endpoints may omit id; never attempt a NULL insert.
+    if (!providerLibraryId) {
+      logger.warn(
+        { name: lib.name, collectionType: lib.collectionType },
+        'Skipping library without provider library ID'
+      )
+      skipped++
+      continue
+    }
+
     // Skip libraries without a collection type (e.g., "Intros", special Emby features)
     // We only care about movies and tvshows libraries
     if (!lib.collectionType) {
-      logger.debug({ libraryId: lib.id, name: lib.name }, 'Skipping library without collection type')
+      logger.debug(
+        { libraryId: providerLibraryId, name: lib.name },
+        'Skipping library without collection type'
+      )
       skipped++
       continue
     }
 
     const existing = await queryOne<LibraryConfigRow>(
       'SELECT * FROM library_config WHERE provider_library_id = $1',
-      [lib.id]
+      [providerLibraryId]
     )
 
     if (existing) {
@@ -206,7 +226,7 @@ export async function syncLibraryConfigsFromProvider(
       if (existing.name !== lib.name) {
         await query(
           `UPDATE library_config SET name = $2, updated_at = NOW() WHERE provider_library_id = $1`,
-          [lib.id, lib.name]
+          [providerLibraryId, lib.name]
         )
         updated++
       }
@@ -215,7 +235,7 @@ export async function syncLibraryConfigsFromProvider(
       await query(
         `INSERT INTO library_config (provider_library_id, name, collection_type, is_enabled)
          VALUES ($1, $2, $3, false)`,
-        [lib.id, lib.name, lib.collectionType]
+        [providerLibraryId, lib.name, lib.collectionType]
       )
       added++
     }
@@ -236,4 +256,3 @@ function mapRowToConfig(row: LibraryConfigRow): LibraryConfig {
     updatedAt: row.updated_at,
   }
 }
-
